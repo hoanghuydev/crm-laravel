@@ -19,6 +19,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Custom Cache Driver
+    |--------------------------------------------------------------------------
+    |
+    | This option controls the custom cache driver for our cache service
+    | implementation. This allows switching between Redis and Memcached
+    | cache services at runtime or via configuration.
+    |
+    */
+
+    'custom_driver' => env('CUSTOM_CACHE_DRIVER', \App\Enums\CacheDriver::REDIS->value),
+
+    /*
+    |--------------------------------------------------------------------------
     | Cache Stores
     |--------------------------------------------------------------------------
     |

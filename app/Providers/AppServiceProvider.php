@@ -18,6 +18,7 @@ use App\Contracts\PaymentMethodRepositoryInterface;
 use App\Contracts\OrderRepositoryInterface;
 use App\Contracts\OrderItemRepositoryInterface;
 use App\Contracts\OrderDiscountRepositoryInterface;
+use App\Contracts\CacheServiceInterface;
 
 // Repositories
 use App\Repositories\CustomerTypeRepository;
@@ -28,6 +29,10 @@ use App\Repositories\PaymentMethodRepository;
 use App\Repositories\OrderRepository;
 use App\Repositories\OrderItemRepository;
 use App\Repositories\OrderDiscountRepository;
+
+// Cache Services
+use App\Services\Cache\CacheManager;
+use App\Services\Cache\CacheFactory;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -45,6 +50,16 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(OrderRepositoryInterface::class, OrderRepository::class);
         $this->app->bind(OrderItemRepositoryInterface::class, OrderItemRepository::class);
         $this->app->bind(OrderDiscountRepositoryInterface::class, OrderDiscountRepository::class);
+
+        // Register Cache Services
+        $this->app->bind(CacheServiceInterface::class, function ($app) {
+            $driver = config('cache.custom_driver', 'redis');
+            return CacheFactory::make($driver);
+        });
+
+        $this->app->singleton('cache.manager', function ($app) {
+            return new CacheManager();
+        });
     }
 
     /**
