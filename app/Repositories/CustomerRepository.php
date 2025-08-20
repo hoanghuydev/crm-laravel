@@ -34,4 +34,37 @@ class CustomerRepository extends BaseRepository implements CustomerRepositoryInt
                            ->orWhere('email', 'like', "%{$term}%")
                            ->get();
     }
+
+    /**
+     * Get customers with filtering and pagination
+     */
+    public function getFilteredCustomers(array $filters = [], int $perPage = 15): \Illuminate\Pagination\LengthAwarePaginator
+    {
+        $query = $this->model->with('customerType');
+
+        // Search functionality
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        // Filter by customer type
+        if (!empty($filters['customer_type'])) {
+            $query->where('customer_type_id', $filters['customer_type']);
+        }
+
+        // Filter by status
+        if (isset($filters['status'])) {
+            if ($filters['status'] === 'active') {
+                $query->active();
+            } elseif ($filters['status'] === 'inactive') {
+                $query->where('is_active', false);
+            }
+        }
+
+        return $query->orderBy('created_at', 'desc')->paginate($perPage);
+    }
 }

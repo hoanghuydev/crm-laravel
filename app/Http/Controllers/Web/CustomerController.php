@@ -28,23 +28,13 @@ class CustomerController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Customer::with('customerType');
+        $filters = [
+            'search' => $request->get('search'),
+            'customer_type' => $request->get('customer_type'),
+            'status' => $request->get('status'),
+        ];
 
-        // Search functionality
-        if ($request->filled('search')) {
-            $search = $request->get('search');
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
-            });
-        }
-
-        // Filter by customer type
-        if ($request->filled('customer_type')) {
-            $query->where('customer_type_id', $request->get('customer_type'));
-        }
-
-        $customers = $query->orderBy('created_at', 'desc')->paginate(15);
+        $customers = $this->customerService->getFilteredCustomers($filters, 15);
         $customerTypes = $this->customerTypeService->getAllActiveCustomerTypes();
 
         return view('customers.index', compact('customers', 'customerTypes'));
@@ -80,9 +70,7 @@ class CustomerController extends Controller
      */
     public function show(Customer $customer)
     {
-        $customer->load(['customerType', 'orders' => function($query) {
-            $query->orderBy('order_date', 'desc');
-        }]);
+        $customer = $this->customerService->getCustomerDetails($customer->id);
         
         return view('customers.show', compact('customer'));
     }

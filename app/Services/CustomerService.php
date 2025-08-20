@@ -156,6 +156,27 @@ class CustomerService
     }
 
     /**
+     * Get customers with filtering and pagination
+     */
+    public function getFilteredCustomers(array $filters = [], int $perPage = 15): \Illuminate\Pagination\LengthAwarePaginator
+    {
+        return $this->customerRepository->getFilteredCustomers($filters, $perPage);
+    }
+
+    /**
+     * Get customer with detailed information
+     */
+    public function getCustomerDetails(int $id): Model
+    {
+        $customer = $this->customerRepository->findOrFail($id);
+        $customer->load(['customerType', 'orders' => function($query) {
+            $query->orderBy('order_date', 'desc');
+        }]);
+        
+        return $customer;
+    }
+
+    /**
      * Get customer statistics
      */
     public function getCustomerStats(int $id): array

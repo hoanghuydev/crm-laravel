@@ -57,4 +57,44 @@ class OrderRepository extends BaseRepository implements OrderRepositoryInterface
                            ->whereIn('status', ['delivered', 'shipped'])
                            ->sum('total');
     }
+
+    /**
+     * Get orders with filtering and pagination
+     */
+    public function getFilteredOrders(array $filters = [], int $perPage = 15): \Illuminate\Pagination\LengthAwarePaginator
+    {
+        $query = $this->model->with(['customer', 'paymentMethod', 'orderItems']);
+
+        // Search functionality
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function($q) use ($search) {
+                $q->where('order_number', 'like', "%{$search}%")
+                  ->orWhereHas('customer', function($customerQuery) use ($search) {
+                      $customerQuery->where('name', 'like', "%{$search}%")
+                                  ->orWhere('email', 'like', "%{$search}%");
+                  });
+            });
+        }
+
+        // Filter by status
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        // Filter by customer
+        if (!empty($filters['customer_id'])) {
+            $query->where('customer_id', $filters['customer_id']);
+        }
+
+        // Filter by date range
+        if (!empty($filters['date_from'])) {
+            $query->whereDate('order_date', '>=', $filters['date_from']);
+        }
+        if (!empty($filters['date_to'])) {
+            $query->whereDate('order_date', '<=', $filters['date_to']);
+        }
+
+        return $query->orderBy('order_date', 'desc')->paginate($perPage);
+    }
 }

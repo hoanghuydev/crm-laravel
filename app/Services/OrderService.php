@@ -224,6 +224,28 @@ class OrderService
     }
 
     /**
+     * Get orders with filtering and pagination
+     */
+    public function getFilteredOrders(array $filters = [], int $perPage = 15): \Illuminate\Pagination\LengthAwarePaginator
+    {
+        return $this->orderRepository->getFilteredOrders($filters, $perPage);
+    }
+
+    /**
+     * Get order with detailed relationships
+     */
+    public function getOrderWithDetails(int $orderId): Model
+    {
+        return $this->orderRepository->findOrFail($orderId)
+                    ->load([
+                        'customer.customerType', 
+                        'paymentMethod', 
+                        'orderItems.product', 
+                        'orderDiscounts.discount'
+                    ]);
+    }
+
+    /**
      * Calculate revenue for date range
      */
     public function calculateRevenue(string $startDate, string $endDate): float

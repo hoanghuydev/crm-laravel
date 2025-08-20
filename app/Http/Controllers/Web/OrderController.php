@@ -36,39 +36,15 @@ class OrderController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Order::with(['customer', 'paymentMethod', 'orderItems']);
+        $filters = [
+            'search' => $request->get('search'),
+            'status' => $request->get('status'),
+            'customer_id' => $request->get('customer_id'),
+            'date_from' => $request->get('date_from'),
+            'date_to' => $request->get('date_to'),
+        ];
 
-        // Search functionality
-        if ($request->filled('search')) {
-            $search = $request->get('search');
-            $query->where(function($q) use ($search) {
-                $q->where('order_number', 'like', "%{$search}%")
-                  ->orWhereHas('customer', function($customerQuery) use ($search) {
-                      $customerQuery->where('name', 'like', "%{$search}%")
-                                  ->orWhere('email', 'like', "%{$search}%");
-                  });
-            });
-        }
-
-        // Filter by status
-        if ($request->filled('status')) {
-            $query->where('status', $request->get('status'));
-        }
-
-        // Filter by customer
-        if ($request->filled('customer_id')) {
-            $query->where('customer_id', $request->get('customer_id'));
-        }
-
-        // Filter by date range
-        if ($request->filled('date_from')) {
-            $query->whereDate('order_date', '>=', $request->get('date_from'));
-        }
-        if ($request->filled('date_to')) {
-            $query->whereDate('order_date', '<=', $request->get('date_to'));
-        }
-
-        $orders = $query->orderBy('order_date', 'desc')->paginate(15);
+        $orders = $this->orderService->getFilteredOrders($filters, 15);
         $customers = $this->customerService->getAllActiveCustomers();
 
         // Status options for filter
@@ -122,12 +98,7 @@ class OrderController extends Controller
      */
     public function show(Order $order)
     {
-        $order->load([
-            'customer.customerType', 
-            'paymentMethod', 
-            'orderItems.product', 
-            'orderDiscounts.discount'
-        ]);
+        $order = $this->orderService->getOrderWithDetails($order->id);
         
         return view('orders.show', compact('order'));
     }
@@ -137,7 +108,7 @@ class OrderController extends Controller
      */
     public function edit(Order $order)
     {
-        $order->load(['customer', 'paymentMethod', 'orderItems.product', 'orderDiscounts.discount']);
+        $order = $this->orderService->getOrderWithDetails($order->id);
         $customers = $this->customerService->getAllActiveCustomers();
         $products = $this->productService->getAllAvailableProducts();
         $paymentMethods = $this->paymentMethodService->getAllActivePaymentMethods();

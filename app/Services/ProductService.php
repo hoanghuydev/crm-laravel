@@ -40,6 +40,14 @@ class ProductService
     }
 
     /**
+     * Get product by ID
+     */
+    public function getProductById(int $id): Model
+    {
+        return $this->productRepository->findOrFail($id);
+    }
+
+    /**
      * Create new product
      */
     public function createProduct(array $data): Model
