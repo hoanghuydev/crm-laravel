@@ -99,4 +99,12 @@ class ProductService
     {
         return $this->productRepository->searchByName($name);
     }
+
+    /**
+     * Get all products with pagination and filters
+     */
+    public function getAllProducts(array $filters = [], int $perPage = 15)
+    {
+        return $this->productRepository->getAllWithFilters($filters, $perPage);
+    }
 }

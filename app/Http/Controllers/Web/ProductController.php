@@ -5,8 +5,9 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Services\ProductService;
 use App\Models\Product;
+use App\Http\Requests\ProductStoreRequest;
+use App\Http\Requests\ProductUpdateRequest;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 
 class ProductController extends Controller
 {
@@ -22,35 +23,13 @@ class ProductController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Product::query();
+        $filters = [
+            'search' => $request->get('search'),
+            'status' => $request->get('status'),
+            'stock_status' => $request->get('stock_status'),
+        ];
 
-        // Search functionality
-        if ($request->filled('search')) {
-            $search = $request->get('search');
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('sku', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
-            });
-        }
-
-        // Filter by status
-        if ($request->filled('status')) {
-            $query->where('status', $request->get('status'));
-        }
-
-        // Filter by stock status
-        if ($request->filled('stock_status')) {
-            if ($request->get('stock_status') === 'in_stock') {
-                $query->where('quantity_in_stock', '>', 0);
-            } elseif ($request->get('stock_status') === 'low_stock') {
-                $query->where('quantity_in_stock', '>', 0)->where('quantity_in_stock', '<=', 10);
-            } elseif ($request->get('stock_status') === 'out_of_stock') {
-                $query->where('quantity_in_stock', '=', 0);
-            }
-        }
-
-        $products = $query->orderBy('created_at', 'desc')->paginate(15);
+        $products = $this->productService->getAllProducts($filters, 15);
 
         return view('products.index', compact('products'));
     }
@@ -66,26 +45,10 @@ class ProductController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(ProductStoreRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'price' => 'required|numeric|min:0',
-            'quantity_in_stock' => 'required|integer|min:0',
-            'sku' => 'nullable|string|max:100|unique:products,sku',
-            'image_url' => 'nullable|url',
-            'status' => 'required|in:active,inactive',
-        ]);
-
-        if ($validator->fails()) {
-            return redirect()->back()
-                ->withErrors($validator)
-                ->withInput();
-        }
-
         try {
-            $product = $this->productService->createProduct($request->all());
+            $product = $this->productService->createProduct($request->validated());
             return redirect()->route('products.show', $product)
                 ->with('success', 'Product created successfully.');
         } catch (\Exception $e) {
@@ -114,27 +77,11 @@ class ProductController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, Product $product)
+    public function update(ProductUpdateRequest $request, Product $product)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'sometimes|string|max:255',
-            'description' => 'nullable|string',
-            'price' => 'sometimes|numeric|min:0',
-            'quantity_in_stock' => 'sometimes|integer|min:0',
-            'sku' => 'nullable|string|max:100|unique:products,sku,' . $product->id,
-            'image_url' => 'nullable|url',
-            'status' => 'sometimes|in:active,inactive',
-        ]);
-
-        if ($validator->fails()) {
-            return redirect()->back()
-                ->withErrors($validator)
-                ->withInput();
-        }
-
         try {
-            $product = $this->productService->updateProduct($product->id, $request->all());
-            return redirect()->route('products.show', $product)
+            $updatedProduct = $this->productService->updateProduct($product->id, $request->validated());
+            return redirect()->route('products.show', $updatedProduct)
                 ->with('success', 'Product updated successfully.');
         } catch (\Exception $e) {
             return redirect()->back()

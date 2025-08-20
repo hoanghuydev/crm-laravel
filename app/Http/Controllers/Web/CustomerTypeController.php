@@ -5,8 +5,9 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Services\CustomerTypeService;
 use App\Models\CustomerType;
+use App\Http\Requests\CustomerTypeStoreRequest;
+use App\Http\Requests\CustomerTypeUpdateRequest;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 
 class CustomerTypeController extends Controller
 {
@@ -20,11 +21,14 @@ class CustomerTypeController extends Controller
     /**
      * Display a listing of the resource.
      */
-    public function index()
+    public function index(Request $request)
     {
-        $customerTypes = CustomerType::withCount('customers')
-            ->orderBy('created_at', 'desc')
-            ->paginate(15);
+        $filters = [
+            'search' => $request->get('search'),
+            'status' => $request->get('status'),
+        ];
+
+        $customerTypes = $this->customerTypeService->getAllCustomerTypes($filters, 15);
 
         return view('customer-types.index', compact('customerTypes'));
     }
@@ -40,23 +44,10 @@ class CustomerTypeController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(CustomerTypeStoreRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:100|unique:customer_types,name',
-            'description' => 'nullable|string',
-            'discount_percentage' => 'required|numeric|min:0|max:100',
-            'min_order_amount' => 'required|numeric|min:0',
-        ]);
-
-        if ($validator->fails()) {
-            return redirect()->back()
-                ->withErrors($validator)
-                ->withInput();
-        }
-
         try {
-            $customerType = $this->customerTypeService->createCustomerType($request->all());
+            $customerType = $this->customerTypeService->createCustomerType($request->validated());
             return redirect()->route('customer-types.show', $customerType)
                 ->with('success', 'Customer type created successfully.');
         } catch (\Exception $e) {
@@ -71,8 +62,13 @@ class CustomerTypeController extends Controller
      */
     public function show(CustomerType $customerType)
     {
-        $customerType->loadCount('customers');
-        return view('customer-types.show', compact('customerType'));
+        try {
+            $customerType = $this->customerTypeService->getCustomerType($customerType->id);
+            return view('customer-types.show', compact('customerType'));
+        } catch (\Exception $e) {
+            return redirect()->route('customer-types.index')
+                ->with('error', $e->getMessage());
+        }
     }
 
     /**
@@ -86,24 +82,11 @@ class CustomerTypeController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, CustomerType $customerType)
+    public function update(CustomerTypeUpdateRequest $request, CustomerType $customerType)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'sometimes|string|max:100|unique:customer_types,name,' . $customerType->id,
-            'description' => 'nullable|string',
-            'discount_percentage' => 'sometimes|numeric|min:0|max:100',
-            'min_order_amount' => 'sometimes|numeric|min:0',
-        ]);
-
-        if ($validator->fails()) {
-            return redirect()->back()
-                ->withErrors($validator)
-                ->withInput();
-        }
-
         try {
-            $customerType = $this->customerTypeService->updateCustomerType($customerType->id, $request->all());
-            return redirect()->route('customer-types.show', $customerType)
+            $updatedCustomerType = $this->customerTypeService->updateCustomerType($customerType->id, $request->validated());
+            return redirect()->route('customer-types.show', $updatedCustomerType)
                 ->with('success', 'Customer type updated successfully.');
         } catch (\Exception $e) {
             return redirect()->back()

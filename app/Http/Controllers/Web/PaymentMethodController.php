@@ -3,38 +3,31 @@
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Services\PaymentMethodService;
 use App\Models\PaymentMethod;
+use App\Http\Requests\PaymentMethodStoreRequest;
+use App\Http\Requests\PaymentMethodUpdateRequest;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Validator;
 
 class PaymentMethodController extends Controller
 {
+    protected PaymentMethodService $paymentMethodService;
+
+    public function __construct(PaymentMethodService $paymentMethodService)
+    {
+        $this->paymentMethodService = $paymentMethodService;
+    }
     /**
      * Display a listing of the resource.
      */
     public function index(Request $request)
     {
-        $query = PaymentMethod::query();
+        $filters = [
+            'search' => $request->get('search'),
+            'status' => $request->get('status'),
+        ];
 
-        // Search functionality
-        if ($request->filled('search')) {
-            $search = $request->get('search');
-            $query->where(function($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
-            });
-        }
-
-        // Filter by status
-        if ($request->filled('status')) {
-            if ($request->get('status') === 'active') {
-                $query->where('is_active', true);
-            } elseif ($request->get('status') === 'inactive') {
-                $query->where('is_active', false);
-            }
-        }
-
-        $paymentMethods = $query->withCount('orders')->orderBy('created_at', 'desc')->paginate(15);
+        $paymentMethods = $this->paymentMethodService->getAllPaymentMethods($filters, 15);
 
         return view('payment-methods.index', compact('paymentMethods'));
     }
@@ -50,32 +43,16 @@ class PaymentMethodController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request)
+    public function store(PaymentMethodStoreRequest $request)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255|unique:payment_methods,name',
-            'description' => 'nullable|string',
-            'is_active' => 'boolean',
-        ]);
-
-        if ($validator->fails()) {
-            return redirect()->back()
-                ->withErrors($validator)
-                ->withInput();
-        }
-
         try {
-            PaymentMethod::create([
-                'name' => $request->name,
-                'description' => $request->description,
-                'is_active' => $request->boolean('is_active', true),
-            ]);
+            $paymentMethod = $this->paymentMethodService->createPaymentMethod($request->validated());
 
-            return redirect()->route('payment-methods.index')
+            return redirect()->route('payment-methods.show', $paymentMethod)
                 ->with('success', 'Payment method created successfully.');
         } catch (\Exception $e) {
             return redirect()->back()
-                ->with('error', 'Error creating payment method: ' . $e->getMessage())
+                ->with('error', $e->getMessage())
                 ->withInput();
         }
     }
@@ -85,8 +62,13 @@ class PaymentMethodController extends Controller
      */
     public function show(PaymentMethod $paymentMethod)
     {
-        $paymentMethod->loadCount('orders');
-        return view('payment-methods.show', compact('paymentMethod'));
+        try {
+            $paymentMethod = $this->paymentMethodService->getPaymentMethodById($paymentMethod->id);
+            return view('payment-methods.show', compact('paymentMethod'));
+        } catch (\Exception $e) {
+            return redirect()->route('payment-methods.index')
+                ->with('error', $e->getMessage());
+        }
     }
 
     /**
@@ -100,32 +82,16 @@ class PaymentMethodController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, PaymentMethod $paymentMethod)
+    public function update(PaymentMethodUpdateRequest $request, PaymentMethod $paymentMethod)
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255|unique:payment_methods,name,' . $paymentMethod->id,
-            'description' => 'nullable|string',
-            'is_active' => 'boolean',
-        ]);
-
-        if ($validator->fails()) {
-            return redirect()->back()
-                ->withErrors($validator)
-                ->withInput();
-        }
-
         try {
-            $paymentMethod->update([
-                'name' => $request->name,
-                'description' => $request->description,
-                'is_active' => $request->boolean('is_active'),
-            ]);
+            $updatedPaymentMethod = $this->paymentMethodService->updatePaymentMethod($paymentMethod->id, $request->validated());
 
-            return redirect()->route('payment-methods.show', $paymentMethod)
+            return redirect()->route('payment-methods.show', $updatedPaymentMethod)
                 ->with('success', 'Payment method updated successfully.');
         } catch (\Exception $e) {
             return redirect()->back()
-                ->with('error', 'Error updating payment method: ' . $e->getMessage())
+                ->with('error', $e->getMessage())
                 ->withInput();
         }
     }
@@ -136,21 +102,19 @@ class PaymentMethodController extends Controller
     public function destroy(PaymentMethod $paymentMethod)
     {
         try {
-            // Check if payment method is used in orders
-            if ($paymentMethod->orders()->count() > 0) {
-                // Deactivate instead of delete if it has orders
-                $paymentMethod->update(['is_active' => false]);
-                return redirect()->route('payment-methods.index')
-                    ->with('success', 'Payment method deactivated successfully (cannot delete as it has associated orders).');
+            $wasDeleted = $this->paymentMethodService->deletePaymentMethod($paymentMethod->id);
+            
+            if ($wasDeleted) {
+                $message = 'Payment method deleted successfully.';
             } else {
-                // Safe to delete if no orders
-                $paymentMethod->delete();
-                return redirect()->route('payment-methods.index')
-                    ->with('success', 'Payment method deleted successfully.');
+                $message = 'Payment method deactivated successfully (cannot delete as it has associated orders).';
             }
+            
+            return redirect()->route('payment-methods.index')
+                ->with('success', $message);
         } catch (\Exception $e) {
             return redirect()->back()
-                ->with('error', 'Error deleting payment method: ' . $e->getMessage());
+                ->with('error', $e->getMessage());
         }
     }
 
@@ -160,14 +124,14 @@ class PaymentMethodController extends Controller
     public function toggleStatus(PaymentMethod $paymentMethod)
     {
         try {
-            $paymentMethod->update(['is_active' => !$paymentMethod->is_active]);
+            $updatedPaymentMethod = $this->paymentMethodService->togglePaymentMethodStatus($paymentMethod->id);
             
-            $status = $paymentMethod->is_active ? 'activated' : 'deactivated';
+            $status = $updatedPaymentMethod->is_active ? 'activated' : 'deactivated';
             return redirect()->back()
                 ->with('success', "Payment method {$status} successfully.");
         } catch (\Exception $e) {
             return redirect()->back()
-                ->with('error', 'Error updating payment method status: ' . $e->getMessage());
+                ->with('error', $e->getMessage());
         }
     }
 }
