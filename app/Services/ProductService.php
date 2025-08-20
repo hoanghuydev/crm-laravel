@@ -32,6 +32,14 @@ class ProductService
     }
 
     /**
+     * Get all available products (active and in stock)
+     */
+    public function getAllAvailableProducts(): Collection
+    {
+        return $this->productRepository->getInStockProducts();
+    }
+
+    /**
      * Create new product
      */
     public function createProduct(array $data): Model

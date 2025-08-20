@@ -5,6 +5,7 @@ use App\Http\Controllers\Web\CustomerController;
 use App\Http\Controllers\Web\CustomerTypeController;
 use App\Http\Controllers\Web\ProductController;
 use App\Http\Controllers\Web\PaymentMethodController;
+use App\Http\Controllers\Web\OrderController;
 
 // Dashboard/Home
 Route::get('/', function () {
@@ -26,5 +27,7 @@ Route::get('products/reports/low-stock', [ProductController::class, 'lowStock'])
 Route::resource('payment-methods', PaymentMethodController::class);
 Route::patch('payment-methods/{paymentMethod}/toggle-status', [PaymentMethodController::class, 'toggleStatus'])->name('payment-methods.toggle-status');
 
-// Orders Management (to be implemented)
-// Route::resource('orders', App\Http\Controllers\Web\OrderController::class);
+// Orders Management
+Route::resource('orders', OrderController::class);
+Route::patch('orders/{order}/cancel', [OrderController::class, 'cancel'])->name('orders.cancel');
+Route::patch('orders/{order}/update-status', [OrderController::class, 'updateStatus'])->name('orders.update-status');

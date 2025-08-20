@@ -30,8 +30,8 @@
                             <a href="{{ route('payment-methods.index') }}" class="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium {{ request()->routeIs('payment-methods.*') ? 'text-blue-600 bg-blue-50' : '' }}">
                                 Payment Methods
                             </a>
-                            <a href="#" class="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium opacity-50 cursor-not-allowed">
-                                Orders (Coming Soon)
+                            <a href="{{ route('orders.index') }}" class="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium {{ request()->routeIs('orders.*') ? 'text-blue-600 bg-blue-50' : '' }}">
+                                Orders
                             </a>
                         </div>
                     </div>
