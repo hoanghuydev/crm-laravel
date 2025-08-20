@@ -24,9 +24,17 @@ class CustomerTypeService
     }
 
     /**
-     * Get all customer types
+     * Get all customer types with pagination and filters
      */
-    public function getAllCustomerTypes(): Collection
+    public function getAllCustomerTypes(array $filters = [], int $perPage = 15)
+    {
+        return $this->customerTypeRepository->getAllWithFilters($filters, $perPage);
+    }
+
+    /**
+     * Get all customer types (without pagination)
+     */
+    public function getAllCustomerTypesCollection(): Collection
     {
         return $this->customerTypeRepository->all();
     }
