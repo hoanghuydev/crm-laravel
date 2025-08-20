@@ -11,6 +11,7 @@ use App\Contracts\DiscountRepositoryInterface;
 use App\Contracts\PaymentMethodRepositoryInterface;
 use App\Services\DiscountService;
 use App\Services\PricingStrategyFactory;
+use App\Services\KafkaProducerService;
 use App\Events\OrderCreated;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
@@ -27,6 +28,7 @@ class OrderService
     protected DiscountRepositoryInterface $discountRepository;
     protected PaymentMethodRepositoryInterface $paymentMethodRepository;
     protected DiscountService $discountService;
+    protected KafkaProducerService $kafkaProducerService;
 
     public function __construct(
         OrderRepositoryInterface $orderRepository,
@@ -36,7 +38,8 @@ class OrderService
         ProductRepositoryInterface $productRepository,
         DiscountRepositoryInterface $discountRepository,
         PaymentMethodRepositoryInterface $paymentMethodRepository,
-        DiscountService $discountService
+        DiscountService $discountService,
+        KafkaProducerService $kafkaProducerService
     ) {
         $this->orderRepository = $orderRepository;
         $this->orderItemRepository = $orderItemRepository;
@@ -46,6 +49,7 @@ class OrderService
         $this->discountRepository = $discountRepository;
         $this->paymentMethodRepository = $paymentMethodRepository;
         $this->discountService = $discountService;
+        $this->kafkaProducerService = $kafkaProducerService;
     }
 
     /**
@@ -139,7 +143,12 @@ class OrderService
             // Fire OrderCreated event for customer score recalculation
             Event::dispatch(new OrderCreated($order));
 
-            return $order->load(['customer', 'paymentMethod', 'orderItems.product', 'orderDiscounts.discount']);
+            $orderData = $order->load(['customer', 'paymentMethod', 'orderItems.product', 'orderDiscounts.discount']);
+
+            // Send order notification to Kafka
+            $this->kafkaProducerService->sendOrderNotification($orderData);
+
+            return $orderData;
         });
     }
 
