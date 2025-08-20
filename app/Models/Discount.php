@@ -13,6 +13,7 @@ class Discount extends Model
         'name',
         'description',
         'type',
+        'discount_category',
         'value',
         'min_order_amount',
         'max_discount_amount',
@@ -40,6 +41,42 @@ class Discount extends Model
     }
 
     /**
+     * Get stackable discount categories configuration
+     */
+    public static function getStackableCategories(): array
+    {
+        return [
+            'product' => ['payment', 'customer'], // Product discounts can stack with payment and customer discounts
+            'payment' => ['product', 'seasonal'], // Payment discounts can stack with product and seasonal discounts
+            'customer' => ['product', 'promotion'], // Customer discounts can stack with product and promotion discounts
+            'seasonal' => ['payment', 'promotion'], // Seasonal discounts can stack with payment and promotion discounts
+            'promotion' => ['customer', 'seasonal'], // Promotion discounts can stack with customer and seasonal discounts
+        ];
+    }
+
+    /**
+     * Check if this discount can stack with another discount
+     */
+    public function canStackWith(Discount $otherDiscount): bool
+    {
+        // Can't stack with itself
+        if ($this->id === $otherDiscount->id) {
+            return false;
+        }
+
+        // Both discounts must allow stacking
+        if (!$this->can_stack || !$otherDiscount->can_stack) {
+            return false;
+        }
+
+        // Check if categories are stackable
+        $stackableCategories = self::getStackableCategories();
+        
+        return isset($stackableCategories[$this->discount_category]) &&
+               in_array($otherDiscount->discount_category, $stackableCategories[$this->discount_category]);
+    }
+
+    /**
      * Get all order discounts
      */
     public function orderDiscounts(): HasMany
@@ -64,6 +101,14 @@ class Discount extends Model
         return $query->where('is_active', true)
                      ->where('start_date', '<=', $now)
                      ->where('end_date', '>=', $now);
+    }
+
+    /**
+     * Scope to get discounts by category
+     */
+    public function scopeByCategory($query, string $category)
+    {
+        return $query->where('discount_category', $category);
     }
 
     /**

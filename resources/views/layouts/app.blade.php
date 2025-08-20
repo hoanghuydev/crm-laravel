@@ -33,6 +33,9 @@
                             <a href="{{ route('orders.index') }}" class="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium {{ request()->routeIs('orders.*') ? 'text-blue-600 bg-blue-50' : '' }}">
                                 Orders
                             </a>
+                            <a href="{{ route('discounts.index') }}" class="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium {{ request()->routeIs('discounts.*') ? 'text-blue-600 bg-blue-50' : '' }}">
+                                Discounts
+                            </a>
                         </div>
                     </div>
                 </div>

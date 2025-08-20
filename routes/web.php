@@ -6,6 +6,7 @@ use App\Http\Controllers\Web\CustomerTypeController;
 use App\Http\Controllers\Web\ProductController;
 use App\Http\Controllers\Web\PaymentMethodController;
 use App\Http\Controllers\Web\OrderController;
+use App\Http\Controllers\Web\DiscountController;
 
 // Dashboard/Home
 Route::get('/', function () {
@@ -31,3 +32,8 @@ Route::patch('payment-methods/{paymentMethod}/toggle-status', [PaymentMethodCont
 Route::resource('orders', OrderController::class);
 Route::patch('orders/{order}/cancel', [OrderController::class, 'cancel'])->name('orders.cancel');
 Route::patch('orders/{order}/update-status', [OrderController::class, 'updateStatus'])->name('orders.update-status');
+
+// Discounts Management
+Route::resource('discounts', DiscountController::class);
+Route::patch('discounts/{discount}/toggle-status', [DiscountController::class, 'toggleStatus'])->name('discounts.toggle-status');
+Route::get('discounts/tools/test-stacking', [DiscountController::class, 'testStacking'])->name('discounts.test-stacking');
