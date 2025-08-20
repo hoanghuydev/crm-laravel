@@ -204,44 +204,12 @@ class CustomerService
     }
 
     /**
-     * Recalculate customer score and potentially reclassify
-     */
-    public function recalculateCustomerScore(int $id): array
-    {
-        $customer = $this->customerRepository->findOrFail($id);
-        
-        $oldScore = $customer->current_score;
-        $oldTypeName = $customer->customerType?->name;
-        
-        $wasReclassified = $this->scoringService->reclassifyCustomer($customer);
-        
-        $customer->refresh();
-        
-        return [
-            'customer_id' => $customer->id,
-            'old_score' => $oldScore,
-            'new_score' => $customer->current_score,
-            'old_type' => $oldTypeName,
-            'new_type' => $customer->customerType?->name,
-            'was_reclassified' => $wasReclassified,
-        ];
-    }
-
-    /**
      * Get customer score breakdown
      */
     public function getCustomerScoreBreakdown(int $id): array
     {
         $customer = $this->customerRepository->findOrFail($id);
         return $this->scoringService->getCustomerScoreBreakdown($customer);
-    }
-
-    /**
-     * Batch recalculate all customer scores
-     */
-    public function batchRecalculateScores(): array
-    {
-        return $this->scoringService->reclassifyAllCustomers();
     }
 
     /**

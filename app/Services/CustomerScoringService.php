@@ -128,36 +128,6 @@ class CustomerScoringService
     }
 
     /**
-     * Batch reclassify all customers
-     */
-    public function reclassifyAllCustomers(): array
-    {
-        $customers = Customer::active()->get();
-        $results = [
-            'total' => $customers->count(),
-            'reclassified' => 0,
-            'errors' => 0,
-        ];
-
-        foreach ($customers as $customer) {
-            try {
-                if ($this->reclassifyCustomer($customer)) {
-                    $results['reclassified']++;
-                }
-            } catch (\Exception $e) {
-                $results['errors']++;
-                Log::error("Failed to reclassify customer {$customer->id}", [
-                    'error' => $e->getMessage()
-                ]);
-            }
-        }
-
-        Log::info("Batch reclassification completed", $results);
-
-        return $results;
-    }
-
-    /**
      * Get normalization data for scoring calculations
      */
     protected function getNormalizationData(): array

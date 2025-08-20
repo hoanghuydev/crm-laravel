@@ -4,8 +4,14 @@ namespace App\Console\Commands;
 
 use Illuminate\Console\Command;
 use App\Services\CustomerScoringService;
+use App\Services\CustomerScoreUpdaterService;
+use App\Services\ScoringResultFormatterService;
 use App\Models\Customer;
 
+/**
+ * Console command for recalculating customer scores
+ * Follows SRP - only handles command interface and delegates to specialized services
+ */
 class RecalculateCustomerScores extends Command
 {
     /**
@@ -21,12 +27,11 @@ class RecalculateCustomerScores extends Command
      */
     protected $description = 'Recalculate customer scores and reclassify customer types';
 
-    protected CustomerScoringService $scoringService;
-
-    public function __construct(CustomerScoringService $scoringService)
-    {
+    public function __construct(
+        protected CustomerScoringService $scoringService,
+        protected CustomerScoreUpdaterService $scoreUpdaterService
+    ) {
         parent::__construct();
-        $this->scoringService = $scoringService;
     }
 
     /**
@@ -39,11 +44,11 @@ class RecalculateCustomerScores extends Command
         $debug = $this->option('debug');
 
         if ($customerId) {
-            return $this->recalculateSpecificCustomer($customerId, $debug);
+            return $this->handleSpecificCustomer((int) $customerId, $debug);
         }
 
         if ($all) {
-            return $this->recalculateAllCustomers($debug);
+            return $this->handleAllCustomers($debug);
         }
 
         $this->error('Please specify either --customer=ID or --all option');
@@ -51,34 +56,24 @@ class RecalculateCustomerScores extends Command
     }
 
     /**
-     * Recalculate scores for specific customer
+     * Handle scoring for specific customer
      */
-    protected function recalculateSpecificCustomer(int $customerId, bool $debug): int
+    protected function handleSpecificCustomer(int $customerId, bool $debug): int
     {
         try {
             $customer = Customer::findOrFail($customerId);
+            $formatter = ScoringResultFormatterService::forCommand($this, $this->scoringService);
             
             $this->info("Recalculating score for customer: {$customer->name} (ID: {$customerId})");
             
-            $oldScore = $customer->current_score;
-            $oldType = $customer->customerType?->name ?? 'Unknown';
-            
-            $wasReclassified = $this->scoringService->reclassifyCustomer($customer);
-            
-            $customer->refresh();
-            
-            $this->info("Results:");
-            $this->line("  Old Score: {$oldScore}");
-            $this->line("  New Score: {$customer->current_score}");
-            $this->line("  Old Type: {$oldType}");
-            $this->line("  New Type: {$customer->customerType->name}");
-            $this->line("  Reclassified: " . ($wasReclassified ? 'Yes' : 'No'));
+            $result = $this->scoreUpdaterService->updateCustomer($customer, $debug);
+            $formatter->displayCustomerResult($result, $debug);
             
             if ($debug) {
-                $this->showScoreBreakdown($customer);
+                $formatter->displayCustomerData($customer);
             }
             
-            return 0;
+            return $result->isSuccessful() ? 0 : 1;
             
         } catch (\Exception $e) {
             $this->error("Error: " . $e->getMessage());
@@ -87,69 +82,22 @@ class RecalculateCustomerScores extends Command
     }
 
     /**
-     * Recalculate scores for all customers
+     * Handle scoring for all customers
      */
-    protected function recalculateAllCustomers(bool $debug): int
+    protected function handleAllCustomers(bool $debug): int
     {
         try {
             $this->info("Recalculating scores for all customers...");
+            $formatter = ScoringResultFormatterService::forCommand($this, $this->scoringService);
             
-            $results = $this->scoringService->reclassifyAllCustomers();
+            $results = $this->scoreUpdaterService->updateAllCustomers();
+            $formatter->displayBatchResults($results, $debug);
             
-            $this->info("Batch recalculation completed!");
-            $this->line("  Total customers: {$results['total']}");
-            $this->line("  Reclassified: {$results['reclassified']}");
-            $this->line("  Errors: {$results['errors']}");
-            
-            if ($debug && $results['total'] > 0) {
-                $this->info("\nDetailed breakdown:");
-                $customers = Customer::with('customerType')->get();
-                
-                $this->table(
-                    ['ID', 'Name', 'Score', 'Type', 'Orders', 'Total Spent', 'Location'],
-                    $customers->map(function ($customer) {
-                        return [
-                            $customer->id,
-                            $customer->name,
-                            number_format($customer->current_score, 3),
-                            $customer->customerType?->name ?? 'N/A',
-                            $customer->getTotalOrderCount(),
-                            number_format($customer->getTotalSpent()),
-                            $customer->isFromHCM() ? 'HCM' : 'Other',
-                        ];
-                    })->toArray()
-                );
-            }
-            
-            return 0;
+            return $results['errors'] === 0 ? 0 : 1;
             
         } catch (\Exception $e) {
             $this->error("Error: " . $e->getMessage());
             return 1;
         }
-    }
-
-    /**
-     * Show detailed score breakdown for a customer
-     */
-    protected function showScoreBreakdown(Customer $customer): void
-    {
-        $breakdown = $this->scoringService->getCustomerScoreBreakdown($customer);
-        
-        $this->info("\nDetailed Score Breakdown:");
-        
-        foreach ($breakdown['breakdown'] as $metric => $data) {
-            $this->line("  {$metric}:");
-            $this->line("    Raw Score: " . number_format($data['raw_score'], 3));
-            $this->line("    Weight: " . number_format($data['weight'], 2));
-            $this->line("    Weighted: " . number_format($data['weighted_score'], 3));
-        }
-        
-        $this->info("\nCustomer Data:");
-        $this->line("  Total Spent: " . number_format($customer->getTotalSpent()));
-        $this->line("  Total Orders: " . $customer->getTotalOrderCount());
-        $this->line("  Avg Days Between Orders: " . number_format($customer->getAverageDaysBetweenOrders(), 1));
-        $this->line("  From HCM: " . ($customer->isFromHCM() ? 'Yes' : 'No'));
-        $this->line("  Last Score Calculated: " . ($customer->last_score_calculated_at ?? 'Never'));
     }
 }

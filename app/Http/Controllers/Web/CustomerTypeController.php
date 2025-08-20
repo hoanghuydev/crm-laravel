@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Services\CustomerTypeService;
-use App\Services\CustomerScoringService;
+use App\Services\CustomerScoreUpdaterService;
 use App\Models\CustomerType;
 use App\Http\Requests\CustomerTypeStoreRequest;
 use App\Http\Requests\CustomerTypeUpdateRequest;
@@ -12,16 +12,10 @@ use Illuminate\Http\Request;
 
 class CustomerTypeController extends Controller
 {
-    protected CustomerTypeService $customerTypeService;
-    protected CustomerScoringService $customerScoringService;
-
     public function __construct(
-        CustomerTypeService $customerTypeService,
-        CustomerScoringService $customerScoringService
-    ) {
-        $this->customerTypeService = $customerTypeService;
-        $this->customerScoringService = $customerScoringService;
-    }
+        protected CustomerTypeService $customerTypeService,
+        protected CustomerScoreUpdaterService $scoreUpdaterService
+    ) {}
 
     /**
      * Display a listing of the resource.
@@ -135,7 +129,7 @@ class CustomerTypeController extends Controller
     public function recalculateScores(Request $request)
     {
         try {
-            $results = $this->customerScoringService->reclassifyAllCustomers();
+            $results = $this->scoreUpdaterService->updateAllCustomers();
             
             $message = "Recalculation completed! {$results['reclassified']} out of {$results['total']} customers were reclassified.";
             
@@ -170,7 +164,7 @@ class CustomerTypeController extends Controller
             \Log::info('Cron job: Starting customer score recalculation');
             
             $startTime = microtime(true);
-            $results = $this->customerScoringService->reclassifyAllCustomers();
+            $results = $this->scoreUpdaterService->updateAllCustomers();
             $endTime = microtime(true);
             
             $executionTime = round($endTime - $startTime, 2);
@@ -180,6 +174,7 @@ class CustomerTypeController extends Controller
                 'message' => 'Customer scores recalculated successfully',
                 'data' => [
                     'total_customers' => $results['total'],
+                    'successful_updates' => $results['successful'],
                     'reclassified_customers' => $results['reclassified'],
                     'errors' => $results['errors'],
                     'execution_time_seconds' => $executionTime,

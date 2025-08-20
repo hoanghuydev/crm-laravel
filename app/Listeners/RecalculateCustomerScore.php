@@ -3,67 +3,54 @@
 namespace App\Listeners;
 
 use App\Events\OrderCreated;
-use App\Services\CustomerScoringService;
+use App\Services\CustomerScoreUpdaterService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Support\Facades\Log;
 
+/**
+ * Event listener that handles customer score recalculation after order creation
+ * Follows SRP - only handles the event and delegates to specialized service
+ */
 class RecalculateCustomerScore implements ShouldQueue
 {
     use InteractsWithQueue;
 
-    protected CustomerScoringService $scoringService;
+    public function __construct(
+        protected CustomerScoreUpdaterService $scoreUpdaterService
+    ) {}
 
     /**
-     * Create the event listener.
-     */
-    public function __construct(CustomerScoringService $scoringService)
-    {
-        $this->scoringService = $scoringService;
-    }
-
-    /**
-     * Handle the event.
+     * Handle the OrderCreated event
      */
     public function handle(OrderCreated $event): void
     {
-        try {
-            $order = $event->order;
-            $customer = $order->customer;
+        $result = $this->scoreUpdaterService->updateAfterOrder($event->order);
 
-            Log::info("Recalculating score for customer {$customer->id} after order {$order->id}");
-
-            // Update customer's last order date
-            $customer->update(['last_order_at' => $order->created_at]);
-
-            // Recalculate and reclassify customer
-            $wasReclassified = $this->scoringService->reclassifyCustomer($customer);
-
-            if ($wasReclassified) {
-                Log::info("Customer {$customer->id} was reclassified to {$customer->fresh()->customerType->name}");
-            }
-
-        } catch (\Exception $e) {
-            Log::error("Failed to recalculate customer score", [
+        // Log additional success details for listener context
+        if ($result->isSuccessful() && $result->wasReclassified) {
+            Log::info("Order-triggered reclassification completed", [
                 'order_id' => $event->order->id,
-                'customer_id' => $event->order->customer_id,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
+                'customer_id' => $result->customer->id,
+                'new_type' => $result->getNewTypeName(),
+                'score_change' => $result->getScoreChange()
             ]);
-
-            // Don't re-throw to prevent order creation from failing
         }
+
+        // Note: Errors are already logged by the service
+        // We don't re-throw to prevent order creation from failing
     }
 
     /**
-     * Handle a job failure.
+     * Handle a job failure
      */
     public function failed(OrderCreated $event, \Throwable $exception): void
     {
-        Log::error("Customer score recalculation job failed", [
+        Log::error("Customer score recalculation job failed completely", [
             'order_id' => $event->order->id,
             'customer_id' => $event->order->customer_id,
-            'error' => $exception->getMessage()
+            'error' => $exception->getMessage(),
+            'trace' => $exception->getTraceAsString()
         ]);
     }
 }
