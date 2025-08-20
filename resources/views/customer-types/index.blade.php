@@ -8,14 +8,25 @@
     <div class="flex justify-between items-center">
         <div>
             <h1 class="text-2xl font-bold text-gray-900">Customer Types</h1>
-            <p class="mt-1 text-sm text-gray-600">Manage customer tiers and their benefits</p>
+            <p class="mt-1 text-sm text-gray-600">Manage customer tiers, scoring thresholds and their benefits</p>
         </div>
-        <x-button href="{{ route('customer-types.create') }}" type="primary">
-            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
-            </svg>
-            Add Customer Type
-        </x-button>
+        <div class="flex gap-3">
+            <form method="POST" action="{{ route('customer-types.recalculate-scores') }}" class="inline">
+                @csrf
+                <x-button type="secondary" onclick="return confirm('This will recalculate scores for all customers. Continue?')">
+                    <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                    </svg>
+                    Recalculate Scores
+                </x-button>
+            </form>
+            <x-button href="{{ route('customer-types.create') }}" type="primary">
+                <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+                </svg>
+                Add Customer Type
+            </x-button>
+        </div>
     </div>
 
     <!-- Customer Types Table -->
@@ -26,6 +37,9 @@
                     <tr>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Type
+                        </th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                            Scoring
                         </th>
                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                             Benefits
@@ -48,6 +62,16 @@
                                 <div>
                                     <div class="text-sm font-medium text-gray-900">{{ $type->name }}</div>
                                     <div class="text-sm text-gray-500">{{ $type->description }}</div>
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap">
+                                <div class="text-sm text-gray-900">
+                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                        Score ≥ {{ number_format($type->minimum_score ?? 0, 2) }}
+                                    </span>
+                                </div>
+                                <div class="text-xs text-gray-500 mt-1">
+                                    Priority: {{ $type->priority ?? 1 }}
                                 </div>
                             </td>
                             <td class="px-6 py-4 whitespace-nowrap">
@@ -99,7 +123,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="px-6 py-12 text-center text-gray-500">
+                            <td colspan="6" class="px-6 py-12 text-center text-gray-500">
                                 <div class="space-y-2">
                                     <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/>

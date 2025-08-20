@@ -131,7 +131,7 @@
                     <x-button type="outline" href="{{ route('products.show', $product) }}">
                         Cancel
                     </x-button>
-                    <x-button type="primary">
+                    <x-button type="primary" submit="true">
                         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
                         </svg>

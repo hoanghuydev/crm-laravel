@@ -9,9 +9,13 @@ use App\Contracts\CustomerRepositoryInterface;
 use App\Contracts\ProductRepositoryInterface;
 use App\Contracts\DiscountRepositoryInterface;
 use App\Contracts\PaymentMethodRepositoryInterface;
+use App\Services\DiscountService;
+use App\Services\PricingStrategyFactory;
+use App\Events\OrderCreated;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 
 class OrderService
 {
@@ -22,6 +26,7 @@ class OrderService
     protected ProductRepositoryInterface $productRepository;
     protected DiscountRepositoryInterface $discountRepository;
     protected PaymentMethodRepositoryInterface $paymentMethodRepository;
+    protected DiscountService $discountService;
 
     public function __construct(
         OrderRepositoryInterface $orderRepository,
@@ -30,7 +35,8 @@ class OrderService
         CustomerRepositoryInterface $customerRepository,
         ProductRepositoryInterface $productRepository,
         DiscountRepositoryInterface $discountRepository,
-        PaymentMethodRepositoryInterface $paymentMethodRepository
+        PaymentMethodRepositoryInterface $paymentMethodRepository,
+        DiscountService $discountService
     ) {
         $this->orderRepository = $orderRepository;
         $this->orderItemRepository = $orderItemRepository;
@@ -39,6 +45,7 @@ class OrderService
         $this->productRepository = $productRepository;
         $this->discountRepository = $discountRepository;
         $this->paymentMethodRepository = $paymentMethodRepository;
+        $this->discountService = $discountService;
     }
 
     /**
@@ -75,35 +82,19 @@ class OrderService
                 ];
             }
 
-            // Calculate customer discount
-            $customerDiscountAmount = 0;
-            $customerDiscountPercentage = $customer->getDiscountPercentage();
-            if ($customerDiscountPercentage > 0 && $subtotal >= $customer->customerType->min_order_amount) {
-                $customerDiscountAmount = $subtotal * ($customerDiscountPercentage / 100);
+            // Calculate customer discount using pricing strategy
+            $pricingStrategy = PricingStrategyFactory::create($customer);
+            $customerDiscountAmount = $pricingStrategy->calculateDiscount($subtotal, $customer);
+
+            // Calculate discount codes using stacking algorithm
+            $discountResult = $this->discountService->calculateTotalDiscount($discountCodes, $subtotal);
+            
+            if (!empty($discountResult['errors'])) {
+                throw new \Exception('Discount validation failed: ' . implode(', ', $discountResult['errors']));
             }
 
-            // Calculate discount codes
-            $discountAmount = 0;
-            $validDiscounts = [];
-            
-            foreach ($discountCodes as $code) {
-                $discount = $this->discountRepository->findByCode($code);
-                if (!$discount) {
-                    throw new \Exception("Discount code {$code} not found");
-                }
-                
-                if (!$discount->isValidForOrder($subtotal)) {
-                    throw new \Exception("Discount code {$code} is not valid for this order");
-                }
-                
-                $codeDiscountAmount = $discount->calculateDiscountAmount($subtotal);
-                $discountAmount += $codeDiscountAmount;
-                
-                $validDiscounts[] = [
-                    'discount' => $discount,
-                    'amount' => $codeDiscountAmount,
-                ];
-            }
+            $discountAmount = $discountResult['total_discount'];
+            $appliedDiscounts = $discountResult['applied_discounts'] ?? [];
 
             // Calculate total
             $total = $subtotal - $customerDiscountAmount - $discountAmount;
@@ -133,17 +124,20 @@ class OrderService
                 $product->reduceStock($item['quantity']);
             }
 
-            // Create order discounts
-            foreach ($validDiscounts as $discountData) {
+            // Create order discounts using stacking results
+            foreach ($appliedDiscounts as $appliedDiscount) {
                 $this->orderDiscountRepository->create([
                     'order_id' => $order->id,
-                    'discount_id' => $discountData['discount']->id,
-                    'discount_amount' => $discountData['amount'],
+                    'discount_id' => $appliedDiscount['discount']->id,
+                    'discount_amount' => $appliedDiscount['amount'],
                 ]);
                 
                 // Increment discount usage
-                $this->discountRepository->incrementUsage($discountData['discount']->id);
+                $appliedDiscount['discount']->incrementUsage();
             }
+
+            // Fire OrderCreated event for customer score recalculation
+            Event::dispatch(new OrderCreated($order));
 
             return $order->load(['customer', 'paymentMethod', 'orderItems.product', 'orderDiscounts.discount']);
         });
@@ -243,6 +237,55 @@ class OrderService
                         'orderItems.product', 
                         'orderDiscounts.discount'
                     ]);
+    }
+
+    /**
+     * Preview order calculation with discount stacking
+     */
+    public function previewOrderCalculation(array $items, array $discountCodes, int $customerId): array
+    {
+        // Validate customer
+        $customer = $this->customerRepository->findOrFail($customerId);
+        
+        // Calculate subtotal
+        $subtotal = 0;
+        $itemsDetails = [];
+        
+        foreach ($items as $item) {
+            $product = $this->productRepository->findOrFail($item['product_id']);
+            $itemTotal = $product->price * $item['quantity'];
+            $subtotal += $itemTotal;
+            
+            $itemsDetails[] = [
+                'product' => $product,
+                'quantity' => $item['quantity'],
+                'unit_price' => $product->price,
+                'total_price' => $itemTotal,
+            ];
+        }
+        
+        // Calculate customer discount using pricing strategy
+        $pricingStrategy = PricingStrategyFactory::create($customer);
+        $customerDiscountAmount = $pricingStrategy->calculateDiscount($subtotal, $customer);
+        $customerDiscountPercentage = $customer->getDiscountPercentage();
+        
+        // Calculate discount codes using stacking algorithm
+        $discountResult = $this->discountService->calculateTotalDiscount($discountCodes, $subtotal);
+        $discountAmount = $discountResult['total_discount'];
+        
+        // Calculate total
+        $total = $subtotal - $customerDiscountAmount - $discountAmount;
+        
+        return [
+            'items' => $itemsDetails,
+            'subtotal' => $subtotal,
+            'customer_discount_percentage' => $customerDiscountPercentage,
+            'customer_discount_amount' => $customerDiscountAmount,
+            'discount_stacking_result' => $discountResult,
+            'discount_amount' => $discountAmount,
+            'total' => $total,
+            'customer' => $customer,
+        ];
     }
 
     /**

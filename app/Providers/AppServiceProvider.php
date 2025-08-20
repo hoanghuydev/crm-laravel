@@ -3,6 +3,11 @@
 namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
+use Illuminate\Support\Facades\Event;
+
+// Events & Listeners
+use App\Events\OrderCreated;
+use App\Listeners\RecalculateCustomerScore;
 
 // Contracts
 use App\Contracts\CustomerTypeRepositoryInterface;
@@ -47,6 +52,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        // Register event listeners
+        Event::listen(OrderCreated::class, RecalculateCustomerScore::class);
     }
 }

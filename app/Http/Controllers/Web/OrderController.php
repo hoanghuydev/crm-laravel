@@ -80,12 +80,12 @@ class OrderController extends Controller
         try {
             $orderData = $request->only(['customer_id', 'payment_method_id', 'notes', 'shipping_address']);
             $items = $request->input('items', []);
-            $discountCodes = $request->input('discount_codes', []);
+            $discountCodes = array_filter($request->input('discount_codes', []), 'strlen');
 
             $order = $this->orderService->createOrder($orderData, $items, $discountCodes);
             
             return redirect()->route('orders.show', $order)
-                ->with('success', 'Order created successfully.');
+                ->with('success', 'Order created successfully with discount stacking applied.');
         } catch (\Exception $e) {
             return redirect()->back()
                 ->with('error', $e->getMessage())
@@ -160,6 +160,39 @@ class OrderController extends Controller
         } catch (\Exception $e) {
             return redirect()->back()
                 ->with('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Preview order calculation with discount stacking
+     */
+    public function previewCalculation(Request $request)
+    {
+        $request->validate([
+            'customer_id' => 'required|exists:customers,id',
+            'items' => 'required|array|min:1',
+            'items.*.product_id' => 'required|exists:products,id',
+            'items.*.quantity' => 'required|integer|min:1',
+            'discount_codes' => 'sometimes|array',
+            'discount_codes.*' => 'string|max:50',
+        ]);
+
+        try {
+            $items = $request->input('items', []);
+            $discountCodes = array_filter($request->input('discount_codes', []), 'strlen');
+            $customerId = $request->input('customer_id');
+
+            $preview = $this->orderService->previewOrderCalculation($items, $discountCodes, $customerId);
+            
+            return response()->json([
+                'success' => true,
+                'data' => $preview
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 400);
         }
     }
 

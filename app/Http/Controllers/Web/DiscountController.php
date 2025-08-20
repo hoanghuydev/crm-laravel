@@ -180,25 +180,6 @@ class DiscountController extends Controller
     }
 
     /**
-     * Test discount stacking algorithm
-     */
-    public function testStacking(Request $request): View
-    {
-        $discountCodes = [];
-        $stackingResult = null;
-        $orderAmount = 0;
-
-        if ($request->filled('discount_codes') && $request->filled('order_amount')) {
-            $discountCodes = array_map('trim', explode(',', $request->discount_codes));
-            $orderAmount = (float) $request->order_amount;
-            
-            $stackingResult = $this->discountService->calculateTotalDiscount($discountCodes, $orderAmount);
-        }
-
-        return view('discounts.test-stacking', compact('discountCodes', 'stackingResult', 'orderAmount'));
-    }
-
-    /**
      * Toggle discount status
      */
     public function toggleStatus(Discount $discount): RedirectResponse

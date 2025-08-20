@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
 use App\Services\CustomerTypeService;
+use App\Services\CustomerScoringService;
 use App\Models\CustomerType;
 use App\Http\Requests\CustomerTypeStoreRequest;
 use App\Http\Requests\CustomerTypeUpdateRequest;
@@ -12,10 +13,14 @@ use Illuminate\Http\Request;
 class CustomerTypeController extends Controller
 {
     protected CustomerTypeService $customerTypeService;
+    protected CustomerScoringService $customerScoringService;
 
-    public function __construct(CustomerTypeService $customerTypeService)
-    {
+    public function __construct(
+        CustomerTypeService $customerTypeService,
+        CustomerScoringService $customerScoringService
+    ) {
         $this->customerTypeService = $customerTypeService;
+        $this->customerScoringService = $customerScoringService;
     }
 
     /**
@@ -85,12 +90,26 @@ class CustomerTypeController extends Controller
     public function update(CustomerTypeUpdateRequest $request, CustomerType $customerType)
     {
         try {
-            $updatedCustomerType = $this->customerTypeService->updateCustomerType($customerType->id, $request->validated());
+            $validatedData = $request->validated();
+            
+            // Debug: Log what we're trying to update
+            \Log::info('Updating CustomerType', [
+                'id' => $customerType->id,
+                'data' => $validatedData
+            ]);
+            
+            $updatedCustomerType = $this->customerTypeService->updateCustomerType($customerType->id, $validatedData);
             return redirect()->route('customer-types.show', $updatedCustomerType)
                 ->with('success', 'Customer type updated successfully.');
         } catch (\Exception $e) {
+            \Log::error('CustomerType update failed', [
+                'id' => $customerType->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
             return redirect()->back()
-                ->with('error', $e->getMessage())
+                ->with('error', 'Update failed: ' . $e->getMessage())
                 ->withInput();
         }
     }
@@ -107,6 +126,83 @@ class CustomerTypeController extends Controller
         } catch (\Exception $e) {
             return redirect()->back()
                 ->with('error', $e->getMessage());
+        }
+    }
+
+    /**
+     * Recalculate all customer scores based on current customer types
+     */
+    public function recalculateScores(Request $request)
+    {
+        try {
+            $results = $this->customerScoringService->reclassifyAllCustomers();
+            
+            $message = "Recalculation completed! {$results['reclassified']} out of {$results['total']} customers were reclassified.";
+            
+            if ($results['errors'] > 0) {
+                $message .= " {$results['errors']} errors occurred.";
+            }
+            
+            return redirect()->route('customer-types.index')
+                ->with('success', $message);
+        } catch (\Exception $e) {
+            return redirect()->back()
+                ->with('error', 'Failed to recalculate scores: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Get default scoring weights for AJAX requests
+     */
+    public function getDefaultWeights()
+    {
+        $defaultType = new CustomerType();
+        return response()->json($defaultType->getDefaultScoringWeights());
+    }
+
+    /**
+     * Recalculate customer scores for cron job
+     * Returns JSON response suitable for API/cron usage
+     */
+    public function cronRecalculateScores()
+    {
+        try {
+            \Log::info('Cron job: Starting customer score recalculation');
+            
+            $startTime = microtime(true);
+            $results = $this->customerScoringService->reclassifyAllCustomers();
+            $endTime = microtime(true);
+            
+            $executionTime = round($endTime - $startTime, 2);
+            
+            $response = [
+                'success' => true,
+                'message' => 'Customer scores recalculated successfully',
+                'data' => [
+                    'total_customers' => $results['total'],
+                    'reclassified_customers' => $results['reclassified'],
+                    'errors' => $results['errors'],
+                    'execution_time_seconds' => $executionTime,
+                    'processed_at' => now()->toISOString(),
+                ],
+            ];
+            
+            \Log::info('Cron job: Customer score recalculation completed', $response['data']);
+            
+            return response()->json($response, 200);
+            
+        } catch (\Exception $e) {
+            \Log::error('Cron job: Customer score recalculation failed', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to recalculate customer scores',
+                'error' => $e->getMessage(),
+                'processed_at' => now()->toISOString(),
+            ], 500);
         }
     }
 }

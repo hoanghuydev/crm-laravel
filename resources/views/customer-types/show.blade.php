@@ -88,6 +88,73 @@
                     </dl>
                 </div>
             </div>
+
+            <!-- Scoring Configuration -->
+            <div class="bg-white shadow overflow-hidden sm:rounded-lg mt-6">
+                <div class="px-4 py-5 sm:px-6">
+                    <h3 class="text-lg leading-6 font-medium text-gray-900">Scoring Configuration</h3>
+                    <p class="mt-1 text-sm text-gray-600">Customer scoring thresholds and weights for this tier</p>
+                </div>
+                <div class="border-t border-gray-200 px-4 py-5 sm:px-6">
+                    <dl class="grid grid-cols-1 gap-x-4 gap-y-6 sm:grid-cols-2">
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Minimum Score Required</dt>
+                            <dd class="mt-1">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                    ≥ {{ number_format($customerType->minimum_score ?? 0, 3) }}
+                                </span>
+                            </dd>
+                        </div>
+                        <div>
+                            <dt class="text-sm font-medium text-gray-500">Priority Level</dt>
+                            <dd class="mt-1">
+                                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
+                                    Level {{ $customerType->priority ?? 1 }}
+                                </span>
+                                <p class="text-xs text-gray-500 mt-1">Higher number = higher priority</p>
+                            </dd>
+                        </div>
+                        
+                        @php
+                            $weights = $customerType->getScoringWeights();
+                            $isCustomWeights = !empty($customerType->scoring_weights);
+                        @endphp
+                        
+                        <div class="sm:col-span-2">
+                            <dt class="text-sm font-medium text-gray-500">
+                                Scoring Weights 
+                                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded text-xs font-medium {{ $isCustomWeights ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800' }}">
+                                    {{ $isCustomWeights ? 'Custom' : 'Default' }}
+                                </span>
+                            </dt>
+                            <dd class="mt-2">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div class="bg-gray-50 rounded-lg p-3">
+                                        <div class="text-sm font-medium text-gray-900">Total Value</div>
+                                        <div class="text-lg font-bold text-blue-600">{{ number_format($weights['total_value_weight'] * 100, 1) }}%</div>
+                                        <div class="text-xs text-gray-500">Customer spending weight</div>
+                                    </div>
+                                    <div class="bg-gray-50 rounded-lg p-3">
+                                        <div class="text-sm font-medium text-gray-900">Order Count</div>
+                                        <div class="text-lg font-bold text-green-600">{{ number_format($weights['order_count_weight'] * 100, 1) }}%</div>
+                                        <div class="text-xs text-gray-500">Number of orders weight</div>
+                                    </div>
+                                    <div class="bg-gray-50 rounded-lg p-3">
+                                        <div class="text-sm font-medium text-gray-900">Frequency</div>
+                                        <div class="text-lg font-bold text-orange-600">{{ number_format($weights['order_frequency_weight'] * 100, 1) }}%</div>
+                                        <div class="text-xs text-gray-500">Order frequency weight</div>
+                                    </div>
+                                    <div class="bg-gray-50 rounded-lg p-3">
+                                        <div class="text-sm font-medium text-gray-900">Location</div>
+                                        <div class="text-lg font-bold text-purple-600">{{ number_format($weights['location_weight'] * 100, 1) }}%</div>
+                                        <div class="text-xs text-gray-500">HCM location weight</div>
+                                    </div>
+                                </div>
+                            </dd>
+                        </div>
+                    </dl>
+                </div>
+            </div>
         </div>
 
         <!-- Stats Sidebar -->

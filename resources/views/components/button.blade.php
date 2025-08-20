@@ -1,4 +1,4 @@
-@props(['type' => 'primary', 'size' => 'md', 'href' => null])
+@props(['type' => 'primary', 'size' => 'md', 'href' => null, 'submit' => false])
 
 @php
     $baseClasses = 'inline-flex items-center justify-center font-medium rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 transition duration-150 ease-in-out';
@@ -19,6 +19,9 @@
     ];
     
     $classes = $baseClasses . ' ' . $sizeClasses[$size] . ' ' . $typeClasses[$type];
+    
+    // Determine button type - if submit is true, use submit, otherwise button
+    $buttonType = $submit ? 'submit' : 'button';
 @endphp
 
 @if($href)
@@ -26,7 +29,7 @@
         {{ $slot }}
     </a>
 @else
-    <button {{ $attributes->merge(['class' => $classes, 'type' => 'button']) }}>
+    <button {{ $attributes->merge(['class' => $classes, 'type' => $buttonType]) }}>
         {{ $slot }}
     </button>
 @endif

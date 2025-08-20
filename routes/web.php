@@ -15,6 +15,9 @@ Route::get('/', function () {
 
 // Customer Types Management
 Route::resource('customer-types', CustomerTypeController::class);
+Route::post('customer-types/recalculate-scores', [CustomerTypeController::class, 'recalculateScores'])->name('customer-types.recalculate-scores');
+Route::get('customer-types/default-weights', [CustomerTypeController::class, 'getDefaultWeights'])->name('customer-types.default-weights');
+Route::get('customer-types/cron/recalculate-scores', [CustomerTypeController::class, 'cronRecalculateScores'])->name('customer-types.cron.recalculate-scores');
 
 // Customer Management
 Route::resource('customers', CustomerController::class);
@@ -30,10 +33,10 @@ Route::patch('payment-methods/{paymentMethod}/toggle-status', [PaymentMethodCont
 
 // Orders Management
 Route::resource('orders', OrderController::class);
+Route::post('orders/preview-calculation', [OrderController::class, 'previewCalculation'])->name('orders.preview-calculation');
 Route::patch('orders/{order}/cancel', [OrderController::class, 'cancel'])->name('orders.cancel');
 Route::patch('orders/{order}/update-status', [OrderController::class, 'updateStatus'])->name('orders.update-status');
 
 // Discounts Management
 Route::resource('discounts', DiscountController::class);
 Route::patch('discounts/{discount}/toggle-status', [DiscountController::class, 'toggleStatus'])->name('discounts.toggle-status');
-Route::get('discounts/tools/test-stacking', [DiscountController::class, 'testStacking'])->name('discounts.test-stacking');

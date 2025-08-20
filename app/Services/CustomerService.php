@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Contracts\CustomerRepositoryInterface;
 use App\Contracts\CustomerTypeRepositoryInterface;
+use App\Services\CustomerScoringService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 
@@ -11,13 +12,16 @@ class CustomerService
 {
     protected CustomerRepositoryInterface $customerRepository;
     protected CustomerTypeRepositoryInterface $customerTypeRepository;
+    protected CustomerScoringService $scoringService;
 
     public function __construct(
         CustomerRepositoryInterface $customerRepository,
-        CustomerTypeRepositoryInterface $customerTypeRepository
+        CustomerTypeRepositoryInterface $customerTypeRepository,
+        CustomerScoringService $scoringService
     ) {
         $this->customerRepository = $customerRepository;
         $this->customerTypeRepository = $customerTypeRepository;
+        $this->scoringService = $scoringService;
     }
 
     /**
@@ -197,5 +201,73 @@ class CustomerService
             'last_order_date' => $lastOrderDate,
             'discount_percentage' => $customer->getDiscountPercentage(),
         ];
+    }
+
+    /**
+     * Recalculate customer score and potentially reclassify
+     */
+    public function recalculateCustomerScore(int $id): array
+    {
+        $customer = $this->customerRepository->findOrFail($id);
+        
+        $oldScore = $customer->current_score;
+        $oldTypeName = $customer->customerType?->name;
+        
+        $wasReclassified = $this->scoringService->reclassifyCustomer($customer);
+        
+        $customer->refresh();
+        
+        return [
+            'customer_id' => $customer->id,
+            'old_score' => $oldScore,
+            'new_score' => $customer->current_score,
+            'old_type' => $oldTypeName,
+            'new_type' => $customer->customerType?->name,
+            'was_reclassified' => $wasReclassified,
+        ];
+    }
+
+    /**
+     * Get customer score breakdown
+     */
+    public function getCustomerScoreBreakdown(int $id): array
+    {
+        $customer = $this->customerRepository->findOrFail($id);
+        return $this->scoringService->getCustomerScoreBreakdown($customer);
+    }
+
+    /**
+     * Batch recalculate all customer scores
+     */
+    public function batchRecalculateScores(): array
+    {
+        return $this->scoringService->reclassifyAllCustomers();
+    }
+
+    /**
+     * Check if customer needs score recalculation
+     */
+    public function needsScoreRecalculation(int $id): bool
+    {
+        $customer = $this->customerRepository->findOrFail($id);
+        return $this->scoringService->shouldRecalculateScore($customer);
+    }
+
+    /**
+     * Get customer with full scoring information
+     */
+    public function getCustomerWithScoring(int $id): Model
+    {
+        $customer = $this->customerRepository->findOrFail($id);
+        $customer->load('customerType');
+        
+        // Add computed scoring data
+        $customer->total_spent_computed = $customer->getTotalSpent();
+        $customer->total_orders_computed = $customer->getTotalOrderCount();
+        $customer->avg_days_between_orders = $customer->getAverageDaysBetweenOrders();
+        $customer->is_from_hcm = $customer->isFromHCM();
+        $customer->score_breakdown = $customer->getScoreBreakdown();
+        
+        return $customer;
     }
 }
