@@ -4,11 +4,13 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Str;
 
 class Product extends Model
 {
     protected $fillable = [
         'name',
+        'slug',
         'description',
         'price',
         'quantity_in_stock',
@@ -68,5 +70,50 @@ class Product extends Model
             $this->status = 'out_of_stock';
         }
         $this->save();
+    }
+
+    /**
+     * Get the route key for the model.
+     */
+    public function getRouteKeyName(): string
+    {
+        return 'slug';
+    }
+
+    /**
+     * Generate a unique slug for the product
+     */
+    public function generateSlug(): string
+    {
+        $slug = Str::slug($this->name);
+        $originalSlug = $slug;
+        $counter = 1;
+
+        while (static::where('slug', $slug)->where('id', '!=', $this->id)->exists()) {
+            $slug = $originalSlug . '-' . $counter;
+            $counter++;
+        }
+
+        return $slug;
+    }
+
+    /**
+     * Boot the model and set up event listeners
+     */
+    protected static function boot(): void
+    {
+        parent::boot();
+
+        static::creating(function ($product) {
+            if (empty($product->slug)) {
+                $product->slug = $product->generateSlug();
+            }
+        });
+
+        static::updating(function ($product) {
+            if ($product->isDirty('name') && empty($product->slug)) {
+                $product->slug = $product->generateSlug();
+            }
+        });
     }
 }
