@@ -74,8 +74,7 @@ class ProductController extends Controller
      */
     public function show(Product $product)
     {
-        $product = $this->productService->getProductById($product->id);
-        
+        // Product is already resolved via route model binding using slug
         return view('products.show', compact('product'));
     }
 

@@ -41,6 +41,10 @@
                             <dd class="mt-1 text-sm text-gray-900">{{ $product->name }}</dd>
                         </div>
                         <div>
+                            <dt class="text-sm font-medium text-gray-500">Slug</dt>
+                            <dd class="mt-1 text-sm text-gray-600 font-mono">{{ $product->slug }}</dd>
+                        </div>
+                        <div>
                             <dt class="text-sm font-medium text-gray-500">SKU</dt>
                             <dd class="mt-1 text-sm text-gray-900">
                                 {{ $product->sku ?: 'No SKU' }}
