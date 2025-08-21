@@ -25,6 +25,7 @@ class ProductUpdateRequest extends FormRequest
         
         return [
             'name' => 'required|string|max:255',
+            'slug' => 'nullable|string|max:255|unique:products,slug,' . $productId . '|regex:/^[a-z0-9\-]+$/',
             'description' => 'nullable|string|max:1000',
             'price' => 'required|numeric|min:0|max:999999999.99',
             'quantity_in_stock' => 'required|integer|min:0|max:999999',
@@ -51,6 +52,9 @@ class ProductUpdateRequest extends FormRequest
             'quantity_in_stock.integer' => 'Stock quantity must be a whole number.',
             'quantity_in_stock.min' => 'Stock quantity cannot be negative.',
             'quantity_in_stock.max' => 'Stock quantity cannot exceed 999,999.',
+            'slug.unique' => 'This slug already exists.',
+            'slug.max' => 'Slug cannot exceed 255 characters.',
+            'slug.regex' => 'Slug can only contain lowercase letters, numbers, and hyphens.',
             'sku.unique' => 'This SKU already exists.',
             'sku.max' => 'SKU cannot exceed 100 characters.',
             'sku.regex' => 'SKU can only contain letters, numbers, hyphens, and underscores.',
@@ -68,6 +72,7 @@ class ProductUpdateRequest extends FormRequest
     {
         return [
             'name' => 'product name',
+            'slug' => 'slug',
             'description' => 'product description',
             'price' => 'price',
             'quantity_in_stock' => 'stock quantity',
@@ -82,6 +87,13 @@ class ProductUpdateRequest extends FormRequest
      */
     protected function prepareForValidation(): void
     {
+        // Clean and lowercase slug
+        if ($this->slug) {
+            $this->merge([
+                'slug' => strtolower(trim($this->slug))
+            ]);
+        }
+
         // Clean and uppercase SKU
         if ($this->sku) {
             $this->merge([

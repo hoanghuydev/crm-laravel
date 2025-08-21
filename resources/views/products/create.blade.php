@@ -27,6 +27,18 @@
                     @enderror
                 </div>
 
+                <!-- Slug -->
+                <div>
+                    <label for="slug" class="block text-sm font-medium text-gray-700">Slug</label>
+                    <input type="text" id="slug" name="slug" value="{{ old('slug') }}"
+                           placeholder="Will be generated from product name if left empty"
+                           class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 @error('slug') border-red-300 @enderror">
+                    <p class="mt-1 text-sm text-gray-500">URL-friendly version of the product name (optional - auto-generated)</p>
+                    @error('slug')
+                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                </div>
+
                 <!-- SKU -->
                 <div>
                     <label for="sku" class="block text-sm font-medium text-gray-700">SKU</label>

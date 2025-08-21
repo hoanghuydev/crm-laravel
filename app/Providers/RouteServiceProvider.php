@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Foundation\Support\Providers\RouteServiceProvider as ServiceProvider;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\Models\Product;
 
 class RouteServiceProvider extends ServiceProvider
 {
@@ -27,6 +28,7 @@ class RouteServiceProvider extends ServiceProvider
         parent::boot();
         
         $this->configureRateLimiting();
+        $this->configureRouteModelBinding();
 
         $this->routes(function () {
             Route::middleware('api')
@@ -35,6 +37,17 @@ class RouteServiceProvider extends ServiceProvider
 
             Route::middleware('web')
                 ->group(base_path('routes/web.php'));
+        });
+    }
+
+    /**
+     * Configure explicit route model bindings for the application.
+     */
+    protected function configureRouteModelBinding(): void
+    {
+        // Explicit binding for product using slug
+        Route::bind('product', function (string $value) {
+            return Product::where('slug', $value)->firstOrFail();
         });
     }
 
