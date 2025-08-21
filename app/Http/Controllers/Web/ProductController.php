@@ -8,6 +8,7 @@ use App\Models\Product;
 use App\Http\Requests\ProductStoreRequest;
 use App\Http\Requests\ProductUpdateRequest;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class ProductController extends Controller
 {
@@ -39,6 +40,11 @@ class ProductController extends Controller
      */
     public function create()
     {
+        // Check if user can create products
+        if (Gate::denies('create-product')) {
+            abort(403, 'Unauthorized. Only admin can create products.');
+        }
+
         return view('products.create');
     }
 
@@ -47,6 +53,11 @@ class ProductController extends Controller
      */
     public function store(ProductStoreRequest $request)
     {
+        // Check if user can create products
+        if (Gate::denies('create-product')) {
+            abort(403, 'Unauthorized. Only admin can create products.');
+        }
+
         try {
             $product = $this->productService->createProduct($request->validated());
             return redirect()->route('products.show', $product)
@@ -73,6 +84,11 @@ class ProductController extends Controller
      */
     public function edit(Product $product)
     {
+        // Check if user can update products
+        if (Gate::denies('update-product')) {
+            abort(403, 'Unauthorized. Only admin can edit products.');
+        }
+
         return view('products.edit', compact('product'));
     }
 
@@ -81,6 +97,11 @@ class ProductController extends Controller
      */
     public function update(ProductUpdateRequest $request, Product $product)
     {
+        // Check if user can update products
+        if (Gate::denies('update-product')) {
+            abort(403, 'Unauthorized. Only admin can update products.');
+        }
+
         try {
             $updatedProduct = $this->productService->updateProduct($product->id, $request->validated());
             return redirect()->route('products.show', $updatedProduct)
@@ -97,6 +118,11 @@ class ProductController extends Controller
      */
     public function destroy(Product $product)
     {
+        // Check if user can delete products
+        if (Gate::denies('delete-product')) {
+            abort(403, 'Unauthorized. Only admin can delete products.');
+        }
+
         try {
             // Set status to inactive instead of deleting
             $this->productService->updateProduct($product->id, ['status' => 'inactive']);

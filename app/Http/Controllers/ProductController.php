@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Gate;
 
 class ProductController extends Controller
 {
@@ -51,8 +52,15 @@ class ProductController extends Controller
      */
     public function update(Request $request, string $id)
     {
-        //
-        return 1;
+        // Check if user can update products
+        if (Gate::denies('update-product')) {
+            return response()->json([
+                'message' => 'Unauthorized. Only admin can update products.'
+            ], 403);
+        }
+
+        // Implementation will be added later
+        return response()->json(['message' => 'Product updated successfully']);
     }
 
     /**

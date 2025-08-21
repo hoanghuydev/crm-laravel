@@ -23,8 +23,9 @@ class User extends Authenticatable
         'password',
         'role',
         'is_active',
+        'last_login_at',
+        'last_logout_at',
     ];
-
     /**
      * The attributes that should be hidden for serialization.
      *
@@ -46,6 +47,8 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'last_login_at' => 'datetime',
+            'last_logout_at' => 'datetime',
         ];
     }
 
