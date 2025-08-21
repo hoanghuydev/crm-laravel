@@ -4,10 +4,19 @@ namespace App\Providers;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 
 // Events & Listeners
 use App\Events\OrderCreated;
+use App\Events\UserLoggedIn;
+use App\Events\UserRegistered;
 use App\Listeners\RecalculateCustomerScore;
+use App\Listeners\SendWelcomeEmail;
+use App\Listeners\LogUserLogin;
+
+// Models & Observers
+use App\Models\User;
+use App\Observers\UserObserver;
 
 // Contracts
 use App\Contracts\CustomerTypeRepositoryInterface;
@@ -67,7 +76,36 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Register model observers
+        User::observe(UserObserver::class);
+
         // Register event listeners
         Event::listen(OrderCreated::class, RecalculateCustomerScore::class);
+        Event::listen(UserRegistered::class, SendWelcomeEmail::class);
+        Event::listen(UserLoggedIn::class, LogUserLogin::class);
+
+        // Register Gates
+        $this->registerGates();
+    }
+
+    /**
+     * Register authorization gates
+     */
+    private function registerGates(): void
+    {
+        // Gate for updating products - only admin can update
+        Gate::define('update-product', function (User $user) {
+            return $user->isAdmin();
+        });
+
+        // Gate for deleting products - only admin can delete
+        Gate::define('delete-product', function (User $user) {
+            return $user->isAdmin();
+        });
+
+        // Gate for creating products - only admin can create
+        Gate::define('create-product', function (User $user) {
+            return $user->isAdmin();
+        });
     }
 }

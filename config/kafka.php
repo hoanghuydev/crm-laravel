@@ -29,7 +29,6 @@ return [
                 'auto_commit' => env('KAFKA_AUTO_COMMIT', true),
                 'group_id' => env('KAFKA_CONSUMER_GROUP_ID', 'laravel_group'),
                 'offset_reset' => env('KAFKA_OFFSET_RESET', 'latest'),
-                'compression' => env('KAFKA_COMPRESSION_TYPE', 'snappy'),
                 'sleep_on_error' => env('KAFKA_SLEEP_ON_ERROR', 5),
                 'partition' => env('KAFKA_PARTITION', 0),
                 'read_timeout' => env('KAFKA_READ_TIMEOUT', 120),
@@ -41,7 +40,6 @@ return [
             ],
             'producer' => [
                 'brokers' => env('KAFKA_BROKERS', 'localhost:9092'),
-                'compression' => env('KAFKA_COMPRESSION_TYPE', 'snappy'),
                 'timeout' => env('KAFKA_TIMEOUT_MS', 10000),
                 'required_acknowledgment' => env('KAFKA_REQUIRED_ACKNOWLEDGMENT', -1),
                 'is_async' => env('KAFKA_IS_ASYNC', false),
@@ -51,6 +49,16 @@ return [
             ],
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Auto Commit Configuration
+    |--------------------------------------------------------------------------
+    |
+    | Enable auto commit for consumers
+    |
+    */
+    'auto_commit' => env('KAFKA_AUTO_COMMIT', true),
 
     /*
     |--------------------------------------------------------------------------

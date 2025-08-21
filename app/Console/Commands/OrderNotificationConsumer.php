@@ -4,7 +4,7 @@ namespace App\Console\Commands;
 
 use App\Services\OrderNotificationService;
 use Illuminate\Console\Command;
-use Mateusjunges\Kafka\Facades\Kafka;
+use Junges\Kafka\Facades\Kafka;
 use Illuminate\Support\Facades\Log;
 
 class OrderNotificationConsumer extends Command
@@ -50,19 +50,20 @@ class OrderNotificationConsumer extends Command
         }
 
         try {
-            $consumer = Kafka::createConsumer([config('kafka.topics.order_notifications')])
-                ->withBrokers(config('kafka.connections.default.consumer.brokers'))
-                ->withConsumerGroupId(config('kafka.connections.default.consumer.group_id'))
-                ->withCommitBatchSize(config('kafka.connections.default.consumer.commit_batch_size'))
+            $consumer = Kafka::consumer([config('kafka.topics.order_notifications')])
+                ->withBrokers('localhost:9092')
+                ->withConsumerGroupId('laravel_order_notifications')
+                ->withCommitBatchSize(1)
+                ->withAutoCommit(true)
+                ->withOptions([
+                    'compression.codec' => 'none',
+                    'auto.offset.reset' => 'latest'
+                ])
                 ->withHandler(function ($message) {
                     $this->handleMessage($message);
                 });
 
-            if ($timeout > 0) {
-                $consumer->consume($timeout);
-            } else {
-                $consumer->consume();
-            }
+            $consumer->build()->consume();
 
             $this->info('Kafka consumer stopped.');
             return self::SUCCESS;

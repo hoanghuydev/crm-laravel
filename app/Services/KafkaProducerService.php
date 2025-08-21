@@ -3,7 +3,8 @@
 namespace App\Services;
 
 use App\Models\Order;
-use Mateusjunges\Kafka\Facades\Kafka;
+use Junges\Kafka\Facades\Kafka;
+use Junges\Kafka\Message\Message;
 use Illuminate\Support\Facades\Log;
 
 class KafkaProducerService
@@ -14,17 +15,23 @@ class KafkaProducerService
     public function sendOrderNotification(Order $order): bool
     {
         try {
-            $message = $this->prepareOrderMessage($order);
+            $messageData = $this->prepareOrderMessage($order);
             
-            $producer = Kafka::publishOn(config('kafka.topics.order_notifications'))
+            $message = Message::create()
+                ->withBody($messageData)
                 ->withHeaders([
                     'timestamp' => now()->timestamp,
                     'event_type' => 'order_created',
                     'source' => 'laravel_app'
+                ]);
+            
+            Kafka::publish(config('kafka.connections.default.producer.brokers'))
+                ->onTopic(config('kafka.topics.order_notifications'))
+                ->withConfigOptions([
+                    'compression.codec' => 'none'
                 ])
-                ->withMessage($message);
-
-            $producer->send();
+                ->withMessage($message)
+                ->send();
 
             Log::info("Order notification sent to Kafka", [
                 'order_id' => $order->id,
@@ -109,25 +116,31 @@ class KafkaProducerService
     public function sendTestMessage(array $data = []): bool
     {
         try {
-            $message = array_merge([
+            $messageData = array_merge([
                 'type' => 'test',
                 'message' => 'Test message from Laravel',
                 'timestamp' => now()->toISOString(),
             ], $data);
 
-            $producer = Kafka::publishOn(config('kafka.topics.order_notifications'))
+            $message = Message::create()
+                ->withBody($messageData)
                 ->withHeaders([
                     'timestamp' => now()->timestamp,
                     'event_type' => 'test',
                     'source' => 'laravel_app'
-                ])
-                ->withMessage($message);
+                ]);
 
-            $producer->send();
+            Kafka::publish(config('kafka.connections.default.producer.brokers'))
+                ->onTopic(config('kafka.topics.order_notifications'))
+                ->withConfigOptions([
+                    'compression.codec' => 'none'
+                ])
+                ->withMessage($message)
+                ->send();
 
             Log::info("Test message sent to Kafka", [
                 'topic' => config('kafka.topics.order_notifications'),
-                'message' => $message
+                'message' => $messageData
             ]);
 
             return true;

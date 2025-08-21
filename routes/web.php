@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Web\AuthController;
 use App\Http\Controllers\Web\CustomerController;
 use App\Http\Controllers\Web\CustomerTypeController;
 use App\Http\Controllers\Web\ProductController;
@@ -8,10 +9,18 @@ use App\Http\Controllers\Web\PaymentMethodController;
 use App\Http\Controllers\Web\OrderController;
 use App\Http\Controllers\Web\DiscountController;
 
+// Authentication Routes
+Route::get('/login', [AuthController::class, 'showLoginForm'])->name('login');
+Route::post('/login', [AuthController::class, 'login']);
+Route::get('/register', [AuthController::class, 'showRegisterForm'])->name('register');
+Route::post('/register', [AuthController::class, 'register']);
+Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
+
 // Dashboard/Home
 Route::get('/', function () {
-    return redirect()->route('customers.index');
+    return redirect()->route('dashboard');
 });
+Route::get('/dashboard', [AuthController::class, 'dashboard'])->name('dashboard')->middleware('auth');
 
 // Customer Types Management
 Route::resource('customer-types', CustomerTypeController::class);

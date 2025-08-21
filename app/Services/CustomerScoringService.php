@@ -4,7 +4,7 @@ namespace App\Services;
 
 use App\Models\Customer;
 use App\Models\CustomerType;
-use App\Services\ScoringStrategies\ScoringStrategyInterface;
+use App\Services\ScoringStrategies\CompositeScoringStrategy;
 use App\Services\ScoringStrategies\TotalValueScoringStrategy;
 use App\Services\ScoringStrategies\OrderCountScoringStrategy;
 use App\Services\ScoringStrategies\OrderFrequencyScoringStrategy;
@@ -14,21 +14,21 @@ use Illuminate\Support\Facades\Log;
 class CustomerScoringService
 {
     /**
-     * @var ScoringStrategyInterface[]
+     * @var CompositeScoringStrategy
      */
-    protected array $strategies;
+    protected CompositeScoringStrategy $compositeStrategy;
 
     /**
-     * Initialize with all scoring strategies
+     * Initialize with composite scoring strategy
      */
     public function __construct()
     {
-        $this->strategies = [
+        $this->compositeStrategy = new CompositeScoringStrategy([
             new TotalValueScoringStrategy(),
             new OrderCountScoringStrategy(),
             new OrderFrequencyScoringStrategy(),
             new LocationScoringStrategy(),
-        ];
+        ]);
     }
 
     /**
@@ -39,40 +39,23 @@ class CustomerScoringService
         // Get normalization data for context
         $normalizationData = $this->getNormalizationData();
         
-        $totalScore = 0;
-        $scoreBreakdown = [];
-
-        foreach ($this->strategies as $strategy) {
-            $strategyScore = $strategy->calculateScore($customer, $normalizationData);
-            $weightedScore = $strategyScore * $strategy->getWeight();
-            $totalScore += $weightedScore;
-            
-            $scoreBreakdown[$strategy->getName()] = $strategyScore;
-            
-            Log::debug("Scoring customer {$customer->id}", [
-                'strategy' => $strategy->getName(),
-                'raw_score' => $strategyScore,
-                'weight' => $strategy->getWeight(),
-                'weighted_score' => $weightedScore
-            ]);
-        }
+        // Use composite strategy to calculate total score
+        $totalScore = $this->compositeStrategy->calculateScore($customer, $normalizationData);
+        
+        // Get breakdown for individual scores
+        $scoreBreakdown = $this->compositeStrategy->getScoreBreakdown($customer, $normalizationData);
 
         // Update individual scores
         $customer->update([
-            'total_value_score' => $scoreBreakdown['total_value'] ?? 0,
-            'order_count_score' => $scoreBreakdown['order_count'] ?? 0,
-            'order_frequency_score' => $scoreBreakdown['order_frequency'] ?? 0,
-            'location_score' => $scoreBreakdown['location'] ?? 0,
-            'current_score' => round($totalScore, 3),
+            'total_value_score' => $scoreBreakdown['total_value']['raw_score'] ?? 0,
+            'order_count_score' => $scoreBreakdown['order_count']['raw_score'] ?? 0,
+            'order_frequency_score' => $scoreBreakdown['order_frequency']['raw_score'] ?? 0,
+            'location_score' => $scoreBreakdown['location']['raw_score'] ?? 0,
+            'current_score' => $totalScore,
             'last_score_calculated_at' => now(),
         ]);
 
-        Log::info("Customer {$customer->id} score calculated", [
-            'total_score' => $totalScore,
-            'breakdown' => $scoreBreakdown
-        ]);
-
-        return round($totalScore, 3);
+        return $totalScore;
     }
 
     /**
@@ -80,7 +63,7 @@ class CustomerScoringService
      */
     public function determineCustomerType(Customer $customer): ?CustomerType
     {
-        $score = $customer->current_score;
+        $score = (float) $customer->current_score;
 
         // Get all active customer types ordered by priority (descending)
         $customerTypes = CustomerType::active()
@@ -146,22 +129,14 @@ class CustomerScoringService
     public function getCustomerScoreBreakdown(Customer $customer): array
     {
         $normalizationData = $this->getNormalizationData();
-        $breakdown = [];
-
-        foreach ($this->strategies as $strategy) {
-            $strategyScore = $strategy->calculateScore($customer, $normalizationData);
-            $breakdown[$strategy->getName()] = [
-                'raw_score' => $strategyScore,
-                'weight' => $strategy->getWeight(),
-                'weighted_score' => $strategyScore * $strategy->getWeight(),
-            ];
-        }
-
-        $totalScore = array_sum(array_column($breakdown, 'weighted_score'));
+        
+        // Use composite strategy to get breakdown
+        $breakdown = $this->compositeStrategy->getScoreBreakdown($customer, $normalizationData);
+        $totalScore = $this->compositeStrategy->calculateScore($customer, $normalizationData);
 
         return [
             'customer_id' => $customer->id,
-            'total_score' => round($totalScore, 3),
+            'total_score' => $totalScore,
             'breakdown' => $breakdown,
             'customer_type' => $customer->customerType?->name,
             'calculated_at' => now()->toISOString(),
@@ -174,5 +149,13 @@ class CustomerScoringService
     public function shouldRecalculateScore(Customer $customer): bool
     {
         return $customer->needsScoreRecalculation();
+    }
+
+    /**
+     * Get the composite scoring strategy
+     */
+    public function getCompositeStrategy(): CompositeScoringStrategy
+    {
+        return $this->compositeStrategy;
     }
 }
